@@ -7,7 +7,7 @@ app.config['MONGO_URI'] = "mongodb+srv://joherrerac:<cotito2001j>@cluster0.dn5pz
 mongo = PyMongo(app)
 
 @app.route('/users', methods=['POST'])
-def create_user():
+def create_products():
     nombre = request.json['nombre']
     descripcion = request.json['descripcion']
     categoria = request.json['categoria']
@@ -15,7 +15,7 @@ def create_user():
     stock = request.json['stock']
     
     if nombre and descripcion and categoria and precio and stock:
-        id = mongo.db.users.insert(
+        id = mongo.db.products.insert(
             {'nombre': nombre, 'descripcion': descripcion, 'categoria': categoria, 'precio': precio, 'stock': stock}
         )
         response = {
@@ -28,8 +28,15 @@ def create_user():
         }
         return response
     else:
-        return "received"
-    
+        return not_found()
+
+@app.errorhandler(404)
+def not_found(error=None):
+    message = {
+        'message': 'Resource not found: ' + request.url,
+        'status': 404
+    }
+    return message
 
 if __name__ == "__main__":
     app.run(debug=True)
