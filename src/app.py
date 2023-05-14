@@ -2,14 +2,18 @@ from flask import Flask, request, jsonify, Response
 from flask_pymongo import PyMongo
 from bson import json_util
 from bson.objectid import ObjectId
+from bson.json_util import dumps
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
 
 app = Flask(__name__)
-app.config['MONGO_URI'] = "mongodb+srv://joherrerac:<cotito2001j>@cluster0.dn5pzce.mongodb.net/?retryWrites=true&w=majority"
+app.config['MONGO_URI'] = "mongodb+srv://joherrerac:<cotito2001j>@proyecto.qvxjnoc.mongodb.net/?retryWrites=true&w=majority"
+# client = MongoClient(uri, server_api=ServerApi('1'))
 
 mongo = PyMongo(app)
 
-@app.route('/users', methods=['POST'])
-def create_products():
+@app.route('/products', methods=['POST'])
+def create_product():
     nombre = request.json['nombre']
     descripcion = request.json['descripcion']
     categoria = request.json['categoria']
@@ -17,60 +21,70 @@ def create_products():
     stock = request.json['stock']
     
     if nombre and descripcion and categoria and precio and stock:
-        id = mongo.db.products.insert(
-            {'nombre': nombre, 'descripcion': descripcion, 'categoria': categoria, 'precio': precio, 'stock': stock}
-        )
-        response = {
-            'id': str(id),
+        products = mongo.db.products
+        product_data = {
             'nombre': nombre,
             'descripcion': descripcion,
             'categoria': categoria,
             'precio': precio,
             'stock': stock
         }
+        result = products.insert_one(product_data)
+        product_id = str(result.inserted_id)
+        product_data['_id'] = product_id
+        return jsonify(product_data)
+    else:
+        return not_found()
+
+@app.route('/products', methods=['GET'])
+def get_products():
+    products = mongo.db.products.find()
+    response = dumps(products)
+    return response
+
+@app.route('/products/<id>', methods=['GET'])
+def get_product(id):
+    product = mongo.db.products.find_one({"_id": ObjectId(id)})
+    if product:
+        response = dumps(product)
         return response
     else:
         return not_found()
 
-@app.route('/users', methods=['GET'])
-def get_users():
-    users = mongo.db.users.find()
-    response = json_util.dumps(users)
-    
-    return Response(response, mimetype='application/json')
+@app.route('/products/<id>', methods=['DELETE'])
+def delete_product(id):
+    result = mongo.db.products.delete_one({"_id": ObjectId(id)})
+    if result.deleted_count == 1:
+        return jsonify({"message": f"Product {id} was deleted successfully"})
+    else:
+        return not_found()
 
-@app.route('/users/<id>', methods=['GET'])
-def get_user(id):
-    user = mongo.db.users.find_one({"_id": ObjectId(id)})
-    response = json_util(user)
-    
-    return Response(response, mimetype='application/json')
-
-@app.route('/users/<id>', methods=['DELETE'])
-def delete_user(id):
-    mongo.db.users.delete_one({"_id": ObjectId(id)})
-    response = jsonify({"message": 'User' + id + 'was deleted succefully'})
-    
-    return response
-
-@app.route('/users/<_id>', methods=['PUT'])
-def update_user(_id):
+@app.route('/products/<id>', methods=['PUT'])
+def update_product(id):
     nombre = request.json['nombre']
     descripcion = request.json['descripcion']
     categoria = request.json['categoria']
     precio = request.json['precio']
     stock = request.json['stock']
     if nombre and descripcion and categoria and precio and stock:
-        mongo.db.users.update_one(
-            {'_id': ObjectId(_id['$oid']) if '$oid' in _id else ObjectId(_id)}, {'$set': {'nombre': nombre, 'descripcion': descripcion, 'categoria': categoria, 'precio': precio, 'stock': stock}})
-        response = jsonify({'message': 'User' + _id + 'Updated Successfuly'})
-        response.status_code = 200
-        return response
+        products = mongo.db.products
+        product_data = {
+            'nombre': nombre,
+            'descripcion': descripcion,
+            'categoria': categoria,
+            'precio': precio,
+            'stock': stock
+        }
+        result = products.update_one(
+            {'_id': ObjectId(id)},
+            {'$set': product_data}
+        )
+        if result.modified_count == 1:
+            return jsonify({'message': f"Product {id} updated successfully"})
+        else:
+            return not_found()
     else:
         return not_found()
-
-
-@app.errorhandler(404)
 
 @app.errorhandler(404)
 def not_found(error=None):
